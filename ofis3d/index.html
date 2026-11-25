@@ -451,8 +451,9 @@ if (sorgu) { const [h, m] = sorgu.split(':').map(Number); const n = new Date(); 
 const simdi = () => new Date(Date.now() + SAAT_FARK);
 const dakika = () => { const d = simdi(); return d.getHours() * 60 + d.getMinutes(); };
 function evreBul() { const m = dakika();
-  if (m < 8 * 60 + 30 || m >= 20 * 60) return 'gece'; if (m < 9 * 60) return 'geliyor'; if (m >= 9 * 60 + 30 && m < 10 * 60) return 'toplanti';
-  if (m >= 12 * 60 + 30 && m < 13 * 60 + 30) return 'ogle'; if (m >= 19 * 60) return 'gidiyor'; return 'mesai'; }
+  // ofis 7/24 çalışır: kimse eve gitmez (Eren'in isteği); sadece sabah toplantısı ve öğle arası var
+  if (m >= 9 * 60 + 30 && m < 10 * 60) return 'toplanti';
+  if (m >= 12 * 60 + 30 && m < 13 * 60 + 30) return 'ogle'; return 'mesai'; }
 const KAPI_DIS = [27.6, 13.0], KAPI_IC = [24.8, 13.0];
 function masaGorevi(k) { const [x, z] = k.o.masa; const l = ISLER[k.o.id];
   return [{ tur: 'git', hedef: [x, z], not: 'Masasına gidiyor' }, { tur: 'otur', yer: [x, z], yon: 0, sure: 35 + Math.random() * 50, masada: true, not: canliIs(k.o.id) || l[Math.random() * l.length | 0] }]; }
@@ -594,10 +595,10 @@ function kare() {
   if (window.__storyBaslik !== sonStory) { sonStory = window.__storyBaslik; storyCiz(0); }
   STANDLAR.forEach((s, i) => { s.yeni.visible = i === 1 && (t % 2) < 1.4; });
   const d = simdi(); yelkovan.rotation.x = -d.getMinutes() / 60 * Math.PI * 2; akrep.rotation.x = -(d.getHours() % 12 + d.getMinutes() / 60) / 12 * Math.PI * 2;
-  document.getElementById('saatYazi').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' · ' + ({ gece: 'ofis kapalı, güvenlik nöbette', geliyor: 'ekip ofise geliyor', toplanti: 'sabah toplantısı', ogle: 'öğle arası', gidiyor: 'mesai bitiyor', mesai: 'mesai' })[evreBul()];
+  document.getElementById('saatYazi').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' · ' + ({ gece: 'ofis kapalı, güvenlik nöbette', geliyor: 'ekip ofise geliyor', toplanti: 'sabah toplantısı', ogle: 'öğle arası', gidiyor: 'mesai bitiyor', mesai: (dakika() >= 20 * 60 || dakika() < 8 * 60) ? 'gece mesaisi' : 'mesai' })[evreBul()];
   // gün ışığı: akşam turuncu, gece koyu
   const sa = d.getHours() + d.getMinutes() / 60; const gece = sa < 7 || sa > 20.5 ? 1 : sa > 18.5 ? (sa - 18.5) / 2 : sa < 8 ? (8 - sa) : 0;
-  gunes.intensity = 2.5 * (1 - gece * 0.85); gok.intensity = 1.45 * (1 - gece * 0.55); gunes.color.setHSL(0.09, 0.6, 0.85 - gece * 0.15 + (sa > 17 && sa < 20 ? -0.08 : 0));
+  gunes.intensity = 2.5 * (1 - gece * 0.5); gok.intensity = 1.45 * (1 - gece * 0.2);   // gece de ışıklar açık, ofis çalışıyor gunes.color.setHSL(0.09, 0.6, 0.85 - gece * 0.15 + (sa > 17 && sa < 20 ? -0.08 : 0));
   sahne.background.setHSL(0.56, 0.35, 0.89 - gece * 0.62);
   kontrol.update(); renderer.render(sahne, kamera);
   requestAnimationFrame(kare);
