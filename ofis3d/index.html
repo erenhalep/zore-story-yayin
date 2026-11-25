@@ -45,7 +45,12 @@ const sahne = new THREE.Scene(); sahne.background = new THREE.Color('#d7e7ef');
 const kamera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.1, 200);
 kamera.position.set(30, 24, 34);
 const kontrol = new OrbitControls(kamera, renderer.domElement);
-kontrol.target.set(12.5, 0.5, 8); kontrol.enableDamping = true; kontrol.maxPolarAngle = Math.PI * 0.47; kontrol.minDistance = 3; kontrol.maxDistance = 60; kontrol.update();
+kontrol.target.set(12.5, 0.5, 8);
+let elle = false; renderer.domElement.addEventListener('pointerdown', () => { elle = true; });
+function cerceve() { if (elle) return; const dik = innerWidth / innerHeight < 0.85;
+  if (dik) { kamera.position.set(42, 30, 9); kontrol.target.set(12, 0, 8); kamera.fov = 40; } else { kamera.position.set(30, 24, 34); kontrol.target.set(12.5, 0.5, 8); kamera.fov = 36; }
+  kamera.updateProjectionMatrix(); kontrol.update(); }
+cerceve(); kontrol.enableDamping = true; kontrol.maxPolarAngle = Math.PI * 0.47; kontrol.minDistance = 3; kontrol.maxDistance = 60; kontrol.update();
 const gok = new THREE.HemisphereLight('#fff8ee', '#a8927a', 1.45); sahne.add(gok);
 const gunes = new THREE.DirectionalLight('#fff1dc', 2.5);
 gunes.position.set(20, 26, 22); gunes.castShadow = true; gunes.shadow.mapSize.setScalar(GOM ? 1024 : 2048);
@@ -570,7 +575,7 @@ function kare() {
   requestAnimationFrame(kare);
 }
 kare();
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix(); });
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix(); cerceve(); });
 window.__kamera = (p, h) => { kamera.position.set(...p); kontrol.target.set(...h); kontrol.update(); };
 window.__durum = () => Object.values(EKIP).map(k => k.o.id + ':' + (k.g ? k.g.tur + '/' + (k.g.not || '') : '-') + '@' + k.kok.position.x.toFixed(1) + ',' + k.kok.position.z.toFixed(1)).join(' | ');
 </script>
