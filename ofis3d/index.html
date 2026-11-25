@@ -31,6 +31,7 @@ html,body{margin:0;height:100%;background:#d7e7ef;font-family:system-ui,-apple-s
 import * as THREE from './lib/three.module.js';
 import { OrbitControls } from './lib/OrbitControls.js';
 import { mergeGeometries } from './lib/BufferGeometryUtils.js';
+import { GLTFLoader } from './lib/GLTFLoader.js';
 
 /* ================= temel ================= */
 const GOM = new URLSearchParams(location.search).has('gom');
@@ -335,23 +336,39 @@ const yosunlar = [];
 for (let i = 0; i < 14; i++) { const h = 0.3 + Math.random() * 0.55, y = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.025, h, 5), mat(['#3f9a4a', '#5bb35a', '#2f7d3b'][i % 3]));
   y.geometry.translate(0, h / 2, 0); y.position.set(-1.6 + Math.random() * 3.2, AKV.y0 + 0.08, -0.25 + Math.random() * 0.3); akvaryum.add(y); yosunlar.push(y); }
 const akvIsik = new THREE.PointLight('#9fe3ff', 2.2, 4); akvIsik.position.set(0, AKV.y0 + AKV.H - 0.1, 0); akvaryum.add(akvIsik);
-// balıklar
-const baliklar = [], RENK = ['#ff7a2f', '#ffd23f', '#3fa7ff', '#ff4f6d', '#ffffff', '#ff9f1c', '#9b5de5', '#00c2a8'];
-for (let i = 0; i < 16; i++) {
-  const b = new THREE.Group(), r = RENK[i % RENK.length], s = 0.6 + Math.random() * 0.7;
-  const govde = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mat(r, 0.4)); govde.scale.set(1.6, 1, 0.55); b.add(govde);
-  const kuyruk = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.06, 4), mat(r, 0.4)); kuyruk.rotation.z = Math.PI / 2; kuyruk.position.x = -0.1; kuyruk.scale.set(1, 1, 0.3); b.add(kuyruk);
-  const goz = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), mat('#111')); goz.position.set(0.055, 0.012, 0.022); b.add(goz);
-  b.scale.setScalar(s); akvaryum.add(b);
-  baliklar.push({ b, kuyruk, hiz: 0.25 + Math.random() * 0.35, faz: Math.random() * 6.28, y: AKV.y0 + 0.25 + Math.random() * (AKV.H - 0.5), z: -0.25 + Math.random() * 0.5, yon: Math.random() < 0.5 ? 1 : -1, x: -1.4 + Math.random() * 2.8 });
-}
+// balıklar: gerçek fotoğraf dokulu balık modeli (Khronos "Barramundi Fish", CC0)
+const baliklar = []; const BALIK_YON = 0;
+(async () => {
+  try {
+    const j = await (await fetch('hayvan/balik.json')).json();
+    const g = await new GLTFLoader().parseAsync(JSON.stringify(j), 'hayvan/');
+    const ham = g.scene; const kutuB = new THREE.Box3().setFromObject(ham), boy = new THREE.Vector3(); kutuB.getSize(boy);
+    const uzunEksen = boy.x >= boy.z ? 'x' : 'z', uzun = Math.max(boy.x, boy.y, boy.z);
+    const merkez = new THREE.Vector3(); kutuB.getCenter(merkez); ham.position.sub(merkez);
+    const sar = new THREE.Group(); sar.add(ham); if (uzunEksen === 'z') ham.parent.rotation.y = 0;
+    const TON = [null, '#ffd9a0', '#e8f2ff', '#ffc2a8', null, '#fff1c9'];
+    for (let i = 0; i < 9; i++) {
+      const b = new THREE.Group(), ic = new THREE.Group(), kopya = ham.clone(true); ic.add(kopya);
+      const taban = (uzunEksen === 'z' ? Math.PI / 2 : 0) + BALIK_YON;   // balığın boyu x ekseninde, başı +x'e baksın
+      ic.rotation.y = taban;
+      const ton = TON[i % TON.length];
+      kopya.traverse(n => { if (n.isMesh) { n.castShadow = false; if (ton) { n.material = n.material.clone(); n.material.color.set(ton); } } });
+      const L = 0.2 + Math.random() * 0.16; ic.scale.setScalar(L / uzun); b.add(ic); akvaryum.add(b);
+      baliklar.push({ b, ic, taban, hiz: 0.18 + Math.random() * 0.22, faz: Math.random() * 6.28, y: AKV.y0 + 0.28 + Math.random() * (AKV.H - 0.55),
+        z: -0.22 + Math.random() * 0.44, yon: Math.random() < 0.5 ? 1 : -1, x: -1.3 + Math.random() * 2.6, donus: 0 });
+    }
+    window.__balik = { uzunEksen, boy: boy.toArray().map(v => +v.toFixed(3)) };
+  } catch (e) { window.__balikHata = String(e); }
+})();
 const kabarcik = [];
 for (let i = 0; i < 18; i++) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), new THREE.MeshBasicMaterial({ color: '#e8fbff', transparent: true, opacity: 0.7 }));
   k.position.set(1.45 + (Math.random() - 0.5) * 0.08, AKV.y0 + 0.1 + Math.random() * AKV.H, -0.2); akvaryum.add(k); kabarcik.push(k); }
 function akvaryumGuncelle(dt, t) {
-  baliklar.forEach(f => { f.x += f.yon * f.hiz * dt; if (f.x > 1.5) { f.x = 1.5; f.yon = -1; } if (f.x < -1.5) { f.x = -1.5; f.yon = 1; }
-    f.b.position.set(f.x, f.y + Math.sin(t * 1.3 + f.faz) * 0.05, f.z + Math.sin(t * 0.7 + f.faz) * 0.08);
-    f.b.rotation.y = f.yon > 0 ? 0 : Math.PI; f.kuyruk.rotation.y = Math.sin(t * 12 + f.faz) * 0.5; });
+  baliklar.forEach(f => { f.x += f.yon * f.hiz * dt; if (f.x > 1.4) { f.x = 1.4; f.yon = -1; } if (f.x < -1.4) { f.x = -1.4; f.yon = 1; }
+    f.b.position.set(f.x, f.y + Math.sin(t * 1.1 + f.faz) * 0.04, f.z + Math.sin(t * 0.6 + f.faz) * 0.07);
+    const hedef = f.yon > 0 ? 0 : Math.PI; let d = hedef - f.b.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); f.b.rotation.y += d * Math.min(1, dt * 3);   // yumuşak dönüş
+    f.b.rotation.z = Math.sin(t * 1.1 + f.faz) * 0.08;
+    f.ic.rotation.y = f.taban + Math.sin(t * 7 + f.faz) * 0.1; });   // yüzme kıpırtısı
   kabarcik.forEach(k => { k.position.y += dt * 0.35; k.position.x += Math.sin(t * 5 + k.id) * 0.0015; if (k.position.y > AKV.y0 + AKV.H - 0.16) k.position.y = AKV.y0 + 0.1; });
   yosunlar.forEach((y, i) => { y.rotation.z = Math.sin(t * 1.2 + i) * 0.12; y.rotation.x = Math.cos(t * 0.9 + i) * 0.08; });
 }
