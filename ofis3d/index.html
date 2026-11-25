@@ -319,6 +319,78 @@ function statikBirlestir() {
 }
 window.__birlesik = statikBirlestir();
 
+/* ================= büyük akvaryum ================= */
+const AKV = { x: 9.2, z: 14.9, L: 3.4, D: 0.75, H: 1.15, y0: 0.82 };
+const akvaryum = new THREE.Group(); akvaryum.position.set(AKV.x, 0, AKV.z); sahne.add(akvaryum);
+parca(yuvarlakKutu(AKV.L + 0.1, AKV.y0, AKV.D + 0.1, 0.03), '#2a2f33', 0, AKV.y0 / 2, 0, akvaryum);           // dolap
+parca(kutu(AKV.L + 0.12, 0.06, AKV.D + 0.12), '#1b1f22', 0, AKV.y0 + AKV.H + 0.03, 0, akvaryum);               // kapak
+const camAkv = new THREE.Mesh(kutu(AKV.L, AKV.H, AKV.D), new THREE.MeshStandardMaterial({ color: '#dff3f7', roughness: 0.05, transparent: true, opacity: 0.16, depthWrite: false }));
+camAkv.position.y = AKV.y0 + AKV.H / 2; akvaryum.add(camAkv);
+const su = new THREE.Mesh(kutu(AKV.L - 0.04, AKV.H - 0.14, AKV.D - 0.04), new THREE.MeshStandardMaterial({ color: '#2f9fc4', roughness: 0.2, transparent: true, opacity: 0.32, depthWrite: false }));
+su.position.y = AKV.y0 + (AKV.H - 0.14) / 2 + 0.01; akvaryum.add(su);
+parca(kutu(AKV.L - 0.04, 0.08, AKV.D - 0.04), '#e3cf9c', 0, AKV.y0 + 0.04, 0, akvaryum);                        // kum
+[[-1.2, 0.18, 0.16], [-0.4, 0.12, 0.11], [0.9, 0.2, 0.17], [1.35, 0.1, 0.09]].forEach(([x, z, r]) =>
+  parca(new THREE.DodecahedronGeometry(r, 0), '#7d7a74', x, AKV.y0 + 0.08 + r * 0.6, z - 0.15, akvaryum));     // taşlar
+const yosunlar = [];
+for (let i = 0; i < 14; i++) { const h = 0.3 + Math.random() * 0.55, y = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.025, h, 5), mat(['#3f9a4a', '#5bb35a', '#2f7d3b'][i % 3]));
+  y.geometry.translate(0, h / 2, 0); y.position.set(-1.6 + Math.random() * 3.2, AKV.y0 + 0.08, -0.25 + Math.random() * 0.3); akvaryum.add(y); yosunlar.push(y); }
+const akvIsik = new THREE.PointLight('#9fe3ff', 2.2, 4); akvIsik.position.set(0, AKV.y0 + AKV.H - 0.1, 0); akvaryum.add(akvIsik);
+// balıklar
+const baliklar = [], RENK = ['#ff7a2f', '#ffd23f', '#3fa7ff', '#ff4f6d', '#ffffff', '#ff9f1c', '#9b5de5', '#00c2a8'];
+for (let i = 0; i < 16; i++) {
+  const b = new THREE.Group(), r = RENK[i % RENK.length], s = 0.6 + Math.random() * 0.7;
+  const govde = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mat(r, 0.4)); govde.scale.set(1.6, 1, 0.55); b.add(govde);
+  const kuyruk = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.06, 4), mat(r, 0.4)); kuyruk.rotation.z = Math.PI / 2; kuyruk.position.x = -0.1; kuyruk.scale.set(1, 1, 0.3); b.add(kuyruk);
+  const goz = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), mat('#111')); goz.position.set(0.055, 0.012, 0.022); b.add(goz);
+  b.scale.setScalar(s); akvaryum.add(b);
+  baliklar.push({ b, kuyruk, hiz: 0.25 + Math.random() * 0.35, faz: Math.random() * 6.28, y: AKV.y0 + 0.25 + Math.random() * (AKV.H - 0.5), z: -0.25 + Math.random() * 0.5, yon: Math.random() < 0.5 ? 1 : -1, x: -1.4 + Math.random() * 2.8 });
+}
+const kabarcik = [];
+for (let i = 0; i < 18; i++) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), new THREE.MeshBasicMaterial({ color: '#e8fbff', transparent: true, opacity: 0.7 }));
+  k.position.set(1.45 + (Math.random() - 0.5) * 0.08, AKV.y0 + 0.1 + Math.random() * AKV.H, -0.2); akvaryum.add(k); kabarcik.push(k); }
+function akvaryumGuncelle(dt, t) {
+  baliklar.forEach(f => { f.x += f.yon * f.hiz * dt; if (f.x > 1.5) { f.x = 1.5; f.yon = -1; } if (f.x < -1.5) { f.x = -1.5; f.yon = 1; }
+    f.b.position.set(f.x, f.y + Math.sin(t * 1.3 + f.faz) * 0.05, f.z + Math.sin(t * 0.7 + f.faz) * 0.08);
+    f.b.rotation.y = f.yon > 0 ? 0 : Math.PI; f.kuyruk.rotation.y = Math.sin(t * 12 + f.faz) * 0.5; });
+  kabarcik.forEach(k => { k.position.y += dt * 0.35; k.position.x += Math.sin(t * 5 + k.id) * 0.0015; if (k.position.y > AKV.y0 + AKV.H - 0.16) k.position.y = AKV.y0 + 0.1; });
+  yosunlar.forEach((y, i) => { y.rotation.z = Math.sin(t * 1.2 + i) * 0.12; y.rotation.x = Math.cos(t * 0.9 + i) * 0.08; });
+}
+
+/* ================= iki büyük papağan (ara papağanı) ================= */
+const tuneklik = new THREE.Group(); tuneklik.position.set(13.2, 0, 14.6); sahne.add(tuneklik);
+parca(silindir(0.32, 0.36, 0.06, 24), '#5a4632', 0, 0.03, 0, tuneklik); parca(silindir(0.035, 0.04, 1.45, 10), '#7a5a3a', 0, 0.75, 0, tuneklik);
+const dal = parca(silindir(0.03, 0.03, 1.1, 10), '#7a5a3a', 0, 1.47, 0, tuneklik); dal.rotation.z = Math.PI / 2;
+parca(silindir(0.08, 0.06, 0.08, 14), '#c9c2b5', 0.5, 1.4, 0.08, tuneklik); parca(silindir(0.08, 0.06, 0.08, 14), '#c9c2b5', -0.5, 1.4, 0.08, tuneklik);   // yem kapları
+function papagan(govdeR, kanatR, gogusR, x) {
+  const p = new THREE.Group(); p.position.set(x, 1.5, 0); tuneklik.add(p);
+  const govde = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), mat(govdeR, 0.6)); govde.scale.set(0.85, 1.35, 0.85); govde.position.y = 0.11; p.add(govde);
+  const gogus = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), mat(gogusR, 0.6)); gogus.scale.set(0.8, 1.2, 0.6); gogus.position.set(0, 0.1, 0.04); p.add(gogus);
+  const bas = new THREE.Group(); bas.position.y = 0.25; p.add(bas);
+  bas.add(new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), mat(govdeR, 0.6)));
+  const yuz = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), mat('#f4f1ea', 0.7)); yuz.position.set(0, -0.005, 0.03); yuz.scale.set(1, 0.9, 0.6); bas.add(yuz);
+  const gaga = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.07, 10), mat('#2b2b2b', 0.4)); gaga.position.set(0, -0.025, 0.075); gaga.rotation.x = Math.PI / 2 + 0.6; bas.add(gaga);
+  [-0.032, 0.032].forEach(gx => { const g = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), mat('#111', 0.3)); g.position.set(gx, 0.012, 0.055); bas.add(g); });
+  const kanatlar = [-1, 1].map(yon => { const k = new THREE.Group(); k.position.set(0.07 * yon, 0.17, -0.01); p.add(k);
+    const kn = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 8), mat(kanatR, 0.6)); kn.scale.set(0.35, 1.3, 0.75); kn.position.set(0.01 * yon, -0.07, -0.01); k.add(kn); return k; });
+  const kuyruk = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.42, 8), mat(govdeR, 0.6)); kuyruk.position.set(0, -0.15, -0.05); kuyruk.rotation.x = Math.PI - 0.25; kuyruk.scale.z = 0.35; p.add(kuyruk);
+  const kuyrukUc = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 8), mat(kanatR, 0.6)); kuyrukUc.position.set(0, -0.34, -0.1); kuyrukUc.rotation.x = Math.PI - 0.25; kuyrukUc.scale.z = 0.35; p.add(kuyrukUc);
+  [-0.03, 0.03].forEach(ax => parca(silindir(0.008, 0.008, 0.05, 6), '#5b5b5b', ax, -0.005, 0.02, p));
+  return { p, bas, kanatlar, faz: Math.random() * 6, sonraki: 2 + Math.random() * 4, cirpma: 0 };
+}
+const papaganlar = [papagan('#d62828', '#1d4ed8', '#e63946', -0.28), papagan('#1f6feb', '#1f6feb', '#ffc300', 0.28)];
+papaganlar[0].p.rotation.y = 0.35; papaganlar[1].p.rotation.y = -0.35; papaganlar.forEach(q => q.p.scale.setScalar(1.5));
+function papaganGuncelle(dt, t) {
+  papaganlar.forEach(q => {
+    q.bas.rotation.y = Math.sin(t * 0.8 + q.faz) * 0.7; q.bas.rotation.z = Math.sin(t * 1.7 + q.faz) * 0.18;
+    q.bas.position.y = 0.25 + Math.max(0, Math.sin(t * 3 + q.faz)) * 0.012;
+    q.sonraki -= dt; if (q.sonraki <= 0) { q.cirpma = 1.2; q.sonraki = 5 + Math.random() * 8; }
+    if (q.cirpma > 0) q.cirpma -= dt;
+    const a = q.cirpma > 0 ? Math.abs(Math.sin(t * 14)) * 1.1 : 0;
+    q.kanatlar[0].rotation.z = -a; q.kanatlar[1].rotation.z = a;
+    q.p.position.y = 1.5 + (q.cirpma > 0 ? Math.abs(Math.sin(t * 14)) * 0.02 : 0);
+  });
+}
+
 /* ================= insanlar ================= */
 const TL = new THREE.TextureLoader(); const TX = {}; let DOKULAR = [];
 const doku = (ad, srgb) => { if (!TX[ad]) { TX[ad] = TL.load('insan/' + ad); if (srgb) TX[ad].colorSpace = THREE.SRGBColorSpace; } return TX[ad]; };
@@ -589,6 +661,7 @@ function kare() {
       k.uyari.visible = cd === 'err' && (t % 1) < 0.6; if (k.uyari.visible) k.uyari.position.set(k.kok.position.x, k.g && k.g.tur === 'otur' ? 1.62 : 2.02, k.kok.position.z);
       e.style.display = v.z < 1 ? '' : 'none'; e.style.transform = 'translate(' + ((v.x * 0.5 + 0.5) * innerWidth).toFixed(1) + 'px,' + ((-v.y * 0.5 + 0.5) * innerHeight).toFixed(1) + 'px) translate(-50%,-100%)'; e.classList.toggle('kucuk', uzak); });
   }
+  akvaryumGuncelle(dt, t); papaganGuncelle(dt, t);
   // küçük detaylar
   buhar.forEach((b, i) => { const f = ((t * 0.5 + i / 3) % 1); b.position.y = 1.42 + f * 0.45; b.position.x = 19.0 + Math.sin(t * 2 + i) * 0.04; b.material.opacity = 0.45 * (1 - f); b.scale.setScalar(0.6 + f); });
   EKRANLAR.forEach((e, i) => e.material.color.setHSL((0.48 + i * 0.07) % 1, 0.45, 0.6 + Math.sin(t * 2 + i) * 0.03));
