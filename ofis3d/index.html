@@ -60,8 +60,14 @@ kontrol.addEventListener('change', () => {   // ofisin dışına kaçmasın
   const t = kontrol.target, ox = THREE.MathUtils.clamp(t.x, 0, 26) - t.x, oz = THREE.MathUtils.clamp(t.z, 0, 16) - t.z;
   if (ox || oz) { t.x += ox; t.z += oz; kamera.position.x += ox; kamera.position.z += oz; }
 });
-renderer.domElement.addEventListener('dblclick', () => cerceve());
-let sonDokunma = 0; renderer.domElement.addEventListener('touchend', e => { const n = Date.now(); if (n - sonDokunma < 300 && e.touches.length === 0) cerceve(); sonDokunma = n; });
+let ELLE = false; kontrol.addEventListener('start', () => { ELLE = true; });
+renderer.domElement.addEventListener('dblclick', () => { ELLE = false; cerceve(); });
+// çift dokunma: sadece TEK parmakla, kıpırdatmadan yapılan iki kısa dokunuş (iki parmakla yakınlaştırıp bırakmak sayılmaz)
+let dk = null, sonTek = 0;
+renderer.domElement.addEventListener('touchstart', e => { dk = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), tek: true } : (dk ? Object.assign(dk, { tek: false }) : { tek: false }); }, { passive: true });
+renderer.domElement.addEventListener('touchmove', e => { if (dk && dk.tek && e.touches[0] && Math.hypot(e.touches[0].clientX - dk.x, e.touches[0].clientY - dk.y) > 12) dk.tek = false; }, { passive: true });
+renderer.domElement.addEventListener('touchend', e => { if (e.touches.length) return; const n = Date.now();
+  if (dk && dk.tek && n - dk.t < 250) { if (n - sonTek < 350) { ELLE = false; cerceve(); sonTek = 0; } else sonTek = n; } else sonTek = 0; dk = null; });
 const KOSE = []; for (const x of [0, 26]) for (const y of [0, 2.4]) for (const z of [0.3, 16]) KOSE.push(new THREE.Vector3(x, y, z));
 function cerceve() {
   if (innerWidth < 4 || innerHeight < 4) return;   // gizli/boyutsuz çerçevede hesaplama yapma (NaN kamerayı bozuyordu)
@@ -711,7 +717,7 @@ function kare() {
   requestAnimationFrame(kare);
 }
 kare();
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; cerceve(); });
+addEventListener('resize', () => { if (innerWidth < 4 || innerHeight < 4) return; renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix(); if (!ELLE) cerceve(); });   // kullanıcı yakınlaştırdıysa ekran boyu değişince görünümü sıfırlama
 window.__kamera = (p, h) => { kamera.position.set(...p); kontrol.target.set(...h); kontrol.update(); };
 window.__kalca = () => { const r = {}; const w = new THREE.Vector3(); Object.values(EKIP).forEach(k => { let b = null; k.m.traverse(n => { if (!b && n.isBone && /Pelvis$/.test(n.name)) b = n; }); if (b) { b.getWorldPosition(w); r[k.o.id] = [w.x, w.z, k.g ? k.g.tur : '']; } }); return r; };
 window.__durum = () => Object.values(EKIP).map(k => k.o.id + ':' + (k.g ? k.g.tur + '/' + (k.g.not || '') : '-') + '@' + k.kok.position.x.toFixed(1) + ',' + k.kok.position.z.toFixed(1)).join(' | ');
