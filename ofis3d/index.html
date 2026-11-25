@@ -9,11 +9,12 @@ html,body{margin:0;height:100%;background:#d7e7ef;font-family:system-ui,-apple-s
 #sahne{position:fixed;inset:0}
 #etiketler{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .etiket{position:absolute;left:0;top:0;will-change:transform;white-space:nowrap;text-align:center;transition:opacity .3s}
-.etiket b{display:block;font:700 11px system-ui;color:#fff;background:rgba(15,110,106,.92);border-radius:999px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.etiket b{display:block;font:700 10px system-ui;color:#fff;background:rgba(15,110,106,.92);border-radius:999px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
 .etiket span{display:inline-block;margin-top:2px;font:600 10.5px system-ui;color:#1d2a28;background:rgba(255,255,255,.95);border-radius:8px;padding:1px 6px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .etiket.kucuk span{display:none}
 .etiket b{pointer-events:auto;cursor:pointer}
 .etiket.err b{background:#d23c3c}.etiket.wait b{background:#c9861a}
+.gom .etiket span{display:none}.gom .etiket b{font-size:9px;padding:1px 6px;opacity:.9}
 .gom .bilgi{font-size:11px;padding:5px 9px;left:8px;bottom:8px;border-radius:9px}.gom .bilgi .ipucu{display:none}
 .bilgi{position:fixed;left:12px;bottom:12px;background:rgba(255,255,255,.93);border-radius:12px;padding:8px 12px;font:13px system-ui;color:#1d2a28;box-shadow:0 2px 10px rgba(0,0,0,.15);max-width:calc(100vw - 24px)}
 .bilgi b{color:#0f6e6a}
@@ -46,11 +47,28 @@ const kamera = new THREE.PerspectiveCamera(36, innerWidth / innerHeight, 0.1, 20
 kamera.position.set(30, 24, 34);
 const kontrol = new OrbitControls(kamera, renderer.domElement);
 kontrol.target.set(12.5, 0.5, 8);
-let elle = false; renderer.domElement.addEventListener('pointerdown', () => { elle = true; });
-function cerceve() { if (elle) return; const dik = innerWidth / innerHeight < 0.85;
-  if (dik) { kamera.position.set(42, 30, 9); kontrol.target.set(12, 0, 8); kamera.fov = 40; } else { kamera.position.set(30, 24, 34); kontrol.target.set(12.5, 0.5, 8); kamera.fov = 36; }
-  kamera.updateProjectionMatrix(); kontrol.update(); }
-cerceve(); kontrol.enableDamping = true; kontrol.maxPolarAngle = Math.PI * 0.47; kontrol.minDistance = 3; kontrol.maxDistance = 60; kontrol.update();
+// sabit kamera: elle çevrilmez; ofis ekrana tam sığacak şekilde otomatik yerleşir
+kontrol.enableRotate = false; kontrol.enablePan = false; kontrol.enableZoom = false;
+const KOSE = []; for (const x of [0, 26]) for (const y of [0, 2.4]) for (const z of [0.3, 16]) KOSE.push(new THREE.Vector3(x, y, z));
+function cerceve() {
+  const dik = innerWidth / innerHeight < 0.85;
+  const yon = (dik ? new THREE.Vector3(1, 1.3, 0.12) : new THREE.Vector3(0.55, 1.0, 1.0)).normalize();
+  kamera.fov = dik ? 34 : 30; kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix();
+  const hedef = new THREE.Vector3(13, 0.6, 8), p = new THREE.Vector3();
+  const sig = (d) => { kamera.position.copy(hedef).addScaledVector(yon, d); kamera.lookAt(hedef); kamera.updateMatrixWorld();
+    let x0 = 9, x1 = -9, y0 = 9, y1 = -9; for (const k of KOSE) { p.copy(k).project(kamera); x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    return [x0, x1, y0, y1]; };
+  for (let tur = 0; tur < 4; tur++) {
+    let a = 5, b = 120; for (let i = 0; i < 30; i++) { const m = (a + b) / 2, [x0, x1, y0, y1] = sig(m); (Math.max(-x0, x1, -y0, y1) > 0.97 ? a = m : b = m); }
+    const [x0, x1, y0, y1] = sig(b); const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    // görüntüyü ortala: hedefi ekran sağ/yukarı yönünde kaydır
+    const sag = new THREE.Vector3().setFromMatrixColumn(kamera.matrixWorld, 0), ust = new THREE.Vector3().setFromMatrixColumn(kamera.matrixWorld, 1);
+    const yar = Math.tan(THREE.MathUtils.degToRad(kamera.fov / 2)) * b;
+    hedef.addScaledVector(sag, cx * yar * kamera.aspect).addScaledVector(ust, cy * yar);
+  }
+  kontrol.target.copy(hedef); kontrol.update();
+}
+cerceve();
 const gok = new THREE.HemisphereLight('#fff8ee', '#a8927a', 1.45); sahne.add(gok);
 const gunes = new THREE.DirectionalLight('#fff1dc', 2.5);
 gunes.position.set(20, 26, 22); gunes.castShadow = true; gunes.shadow.mapSize.setScalar(GOM ? 1024 : 2048);
@@ -562,9 +580,9 @@ function kare() {
     kapiAci += ((kisiYakin(16.6, 4.05, 1.3) ? 1.5 : 0) - kapiAci) * Math.min(1, dt * 4); kapiM.rotation.y = kapiAci;
     girisAci += ((kisiYakin(26, 13, 1.8) ? 1.35 : 0) - girisAci) * Math.min(1, dt * 4); girisSol.rotation.y = -girisAci; girisSag.rotation.y = girisAci;
     // etiketler
-    const uzak = kamera.position.distanceTo(kontrol.target) > 26;
+    const uzak = GOM || kamera.position.distanceTo(kontrol.target) > 26;
     Object.values(EKIP).forEach(k => { const e = k.etiket; if (!k.kok.visible) { e.style.display = 'none'; return; }
-      v.copy(k.kok.position); v.y = k.g && k.g.tur === 'otur' ? 1.55 : 1.95; v.project(kamera);
+      v.copy(k.kok.position); v.y = k.g && k.g.tur === 'otur' ? 1.6 : 2.0; v.project(kamera);
       const cd = CANLI[k.o.id] && CANLI[k.o.id].durum; e.classList.toggle('err', cd === 'err'); e.classList.toggle('wait', cd === 'wait');
       if (k.g && k.g.masada && canliIs(k.o.id) && k.durumYazi.textContent !== canliIs(k.o.id)) k.durumYazi.textContent = canliIs(k.o.id);
       k.uyari.visible = cd === 'err' && (t % 1) < 0.6; if (k.uyari.visible) k.uyari.position.set(k.kok.position.x, k.g && k.g.tur === 'otur' ? 1.62 : 2.02, k.kok.position.z);
@@ -585,7 +603,7 @@ function kare() {
   requestAnimationFrame(kare);
 }
 kare();
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix(); cerceve(); });
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; cerceve(); });
 window.__kamera = (p, h) => { kamera.position.set(...p); kontrol.target.set(...h); kontrol.update(); };
 window.__kalca = () => { const r = {}; const w = new THREE.Vector3(); Object.values(EKIP).forEach(k => { let b = null; k.m.traverse(n => { if (!b && n.isBone && /Pelvis$/.test(n.name)) b = n; }); if (b) { b.getWorldPosition(w); r[k.o.id] = [w.x, w.z, k.g ? k.g.tur : '']; } }); return r; };
 window.__durum = () => Object.values(EKIP).map(k => k.o.id + ':' + (k.g ? k.g.tur + '/' + (k.g.not || '') : '-') + '@' + k.kok.position.x.toFixed(1) + ',' + k.kok.position.z.toFixed(1)).join(' | ');
