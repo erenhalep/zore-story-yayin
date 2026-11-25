@@ -13,6 +13,7 @@ html,body{margin:0;height:100%;background:#d7e7ef;font-family:system-ui,-apple-s
 .etiket span{display:inline-block;margin-top:2px;font:600 10.5px system-ui;color:#1d2a28;background:rgba(255,255,255,.95);border-radius:8px;padding:1px 6px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .etiket.kucuk span{display:none}
 .etiket b{pointer-events:auto;cursor:pointer}
+.etiket .ev{font-style:normal;margin-left:5px;padding:0 5px;border-radius:8px;background:#fff;color:#1d2a28;font-size:.95em}
 .etiket.err b{background:#d23c3c}.etiket.wait b{background:#c9861a}
 .gom .etiket span{display:none}.gom .etiket b{font-size:9px;padding:1px 6px;opacity:.9}
 .gom .bilgi{font-size:11px;padding:5px 9px;left:8px;bottom:8px;border-radius:9px}.gom .bilgi .ipucu{display:none}
@@ -500,7 +501,20 @@ addEventListener('message', e => { const d = e.data || {}; if (d.tur !== 'ajanla
   d.liste.forEach(a => { const onceki = CANLI[a.id]; CANLI[a.id] = { durum: a.durum, is: a.is || '' };
     const k = EKIP[a.id]; if (!k) return;
     if ((!onceki || onceki.durum !== a.durum) && (a.durum === 'err' || a.durum === 'work') && k.o.masa && !k.evde) { k.kuyruk = []; k.g = null; } });
-  if (d.story) window.__storyBaslik = d.story; });
+  if (d.story) window.__storyBaslik = d.story;
+  if (d.evrak) evrakGuncelle(d.evrak); });
+// masalardaki evrak yığınları: her ajanın elindeki iş sayısı kadar kâğıt (en fazla 8 katman) + etikette sayı
+const EVRAK = {}, KAGIT = new THREE.MeshStandardMaterial({ color: '#fbfaf6', roughness: 0.9 }), KAGIT2 = new THREE.MeshStandardMaterial({ color: '#f1e6c8', roughness: 0.9 });
+function evrakGuncelle(say) {
+  Object.values(EKIP).forEach(k => {
+    if (!k.o.masa) return; const n = say[k.o.id] || 0, id = k.o.id;
+    if (!EVRAK[id]) { const g = new THREE.Group(); const [x, z] = k.o.masa; g.position.set(x + 0.52, 0.785, z + 0.5 + (id === 'mudur' ? 0.25 : 0)); sahne.add(g); EVRAK[id] = { g, n: -1 }; }
+    const e = EVRAK[id]; if (e.n === n) return; e.n = n; e.g.clear();
+    for (let i = 0; i < Math.min(n, 8); i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.016, 0.33), i % 2 ? KAGIT2 : KAGIT); m.position.y = 0.008 + i * 0.018; m.rotation.y = (Math.sin(i * 7.3) * 0.12); m.castShadow = true; e.g.add(m); }
+    let r = k.etiket.querySelector('.ev'); if (!r) { r = document.createElement('i'); r.className = 'ev'; k.etiket.querySelector('b').append(r); }
+    r.textContent = n ? '📄' + n : ''; r.style.display = n ? '' : 'none';
+  });
+}
 const canliIs = id => CANLI[id] && CANLI[id].durum !== 'idle' && CANLI[id].is;
 
 /* ---- yürüme yolları: koridorlar üzerinden basit yol bulma ---- */
