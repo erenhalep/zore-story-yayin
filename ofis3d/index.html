@@ -26,7 +26,7 @@ html,body{margin:0;height:100%;background:#d7e7ef;font-family:system-ui,-apple-s
 <div id="sahne"></div>
 <div id="etiketler"></div>
 <div class="yukleniyor" id="yuk"><span>Zore Antalya Ofis açılıyor…</span><i><b id="yukb"></b></i><small id="yukt"></small></div>
-<div class="bilgi" id="bilgi"><b>Zore Antalya Ofis</b> · <span id="saatYazi"></span> <span class="ipucu">· parmakla kaydır, iki parmakla yakınlaştır, çift dokun: baştaki görünüm</span></div>
+<div class="bilgi" id="bilgi"><b>Zore Antalya Ofis</b> · <span id="saatYazi"></span> <span class="ipucu">· parmakla çevir, iki parmakla yakınlaştır/kaydır, çift dokun: baştaki görünüm</span></div>
 <script type="module">
 import * as THREE from './lib/three.module.js';
 import { OrbitControls } from './lib/OrbitControls.js';
@@ -49,10 +49,12 @@ kamera.position.set(30, 24, 34);
 const kontrol = new OrbitControls(kamera, renderer.domElement);
 kontrol.target.set(12.5, 0.5, 8);
 // sabit kamera: elle çevrilmez; ofis ekrana tam sığacak şekilde otomatik yerleşir
-kontrol.enableRotate = false; kontrol.enablePan = true; kontrol.enableZoom = true; kontrol.screenSpacePanning = true;
+kontrol.enableRotate = true; kontrol.enablePan = true; kontrol.enableDamping = true; kontrol.dampingFactor = 0.08; kontrol.rotateSpeed = 0.6; kontrol.enableZoom = true; kontrol.screenSpacePanning = true;
 // döndürme yok: tek parmak/sol tık kaydırır, iki parmak/teker yakınlaştırır; çift dokununca ilk görünüme döner
-kontrol.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
-kontrol.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+// tek parmak/sol tık: ofisi çevirerek yönlendir (sınırlı açı, takla atmaz); iki parmak: yakınlaştır + kaydır; çift dokun: baştaki görünüm
+kontrol.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+kontrol.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+kontrol.minPolarAngle = 0.25; kontrol.maxPolarAngle = 1.25;
 let ilkUzaklik = 30;
 kontrol.addEventListener('change', () => {   // ofisin dışına kaçmasın
   const t = kontrol.target, ox = THREE.MathUtils.clamp(t.x, 0, 26) - t.x, oz = THREE.MathUtils.clamp(t.z, 0, 16) - t.z;
@@ -63,7 +65,7 @@ let sonDokunma = 0; renderer.domElement.addEventListener('touchend', e => { cons
 const KOSE = []; for (const x of [0, 26]) for (const y of [0, 2.4]) for (const z of [0.3, 16]) KOSE.push(new THREE.Vector3(x, y, z));
 function cerceve() {
   if (innerWidth < 4 || innerHeight < 4) return;   // gizli/boyutsuz çerçevede hesaplama yapma (NaN kamerayı bozuyordu)
-  kontrol.minDistance = 0; kontrol.maxDistance = Infinity;   // önceki boyuttan kalan sınır yeni çerçeveyi kırpmasın
+  kontrol.minDistance = 0; kontrol.maxDistance = Infinity; kontrol.minAzimuthAngle = -Infinity; kontrol.maxAzimuthAngle = Infinity;   // önceki boyuttan kalan sınır yeni çerçeveyi kırpmasın
   const dik = innerWidth / innerHeight < 0.85;
   const yon = (dik ? new THREE.Vector3(1, 1.3, 0.12) : new THREE.Vector3(0.55, 1.0, 1.0)).normalize();
   kamera.fov = dik ? 34 : 30; kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix();
@@ -81,6 +83,7 @@ function cerceve() {
   }
   kontrol.target.copy(hedef); kontrol.update();
   ilkUzaklik = kamera.position.distanceTo(hedef);
+  { const az = Math.atan2(kamera.position.x - hedef.x, kamera.position.z - hedef.z); kontrol.minAzimuthAngle = az - 1.2; kontrol.maxAzimuthAngle = az + 1.2; }
   if (isFinite(ilkUzaklik) && ilkUzaklik > 0) { kontrol.minDistance = ilkUzaklik * 0.18; kontrol.maxDistance = ilkUzaklik * 1.15; }
 }
 cerceve();
