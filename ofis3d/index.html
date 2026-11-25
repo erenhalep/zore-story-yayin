@@ -63,6 +63,7 @@ let sonDokunma = 0; renderer.domElement.addEventListener('touchend', e => { cons
 const KOSE = []; for (const x of [0, 26]) for (const y of [0, 2.4]) for (const z of [0.3, 16]) KOSE.push(new THREE.Vector3(x, y, z));
 function cerceve() {
   if (innerWidth < 4 || innerHeight < 4) return;   // gizli/boyutsuz çerçevede hesaplama yapma (NaN kamerayı bozuyordu)
+  kontrol.minDistance = 0; kontrol.maxDistance = Infinity;   // önceki boyuttan kalan sınır yeni çerçeveyi kırpmasın
   const dik = innerWidth / innerHeight < 0.85;
   const yon = (dik ? new THREE.Vector3(1, 1.3, 0.12) : new THREE.Vector3(0.55, 1.0, 1.0)).normalize();
   kamera.fov = dik ? 34 : 30; kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix();
