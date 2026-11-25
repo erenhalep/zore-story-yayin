@@ -192,6 +192,15 @@ pencere(3.0); pencere(9.7, 3.0); pencere(19.0); pencere(23.5);
 
 /* ================= mobilya ================= */
 const EKRANLAR = [];
+const KLV_X = 0.04, KLV_Z = -0.27, FARE_X = -0.33;   // kişi +z'ye bakar: sağ eli -x tarafında
+const KLAVYE_GEO = new THREE.PlaneGeometry(0.44, 0.145);
+const KLAVYE_MAT = new THREE.MeshStandardMaterial({ roughness: 0.55, map: (() => {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 170; const x = c.getContext('2d');
+  x.fillStyle = '#1e2124'; x.fillRect(0, 0, 512, 170);
+  const satir = [[15, 1], [14, 1.08], [13, 1.17], [12, 1.27]]; let y = 10;
+  satir.forEach(([n]) => { const w = 492 / n; for (let i = 0; i < n; i++) { x.fillStyle = '#3b4046'; x.fillRect(10 + i * w + 2, y, w - 4, 28); x.fillStyle = '#4a5057'; x.fillRect(10 + i * w + 3, y + 1, w - 6, 4); } y += 32; });
+  x.fillStyle = '#3b4046'; x.fillRect(120, y, 250, 26); x.fillRect(10, y, 100, 26); x.fillRect(380, y, 122, 26);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; })() });
 function masa(x, z, yon = 0, renk = '#efe3cf') {
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = yon; sahne.add(g);
   parca(yuvarlakKutu(1.6, 0.06, 0.8, 0.025), renk, 0, 0.75, 0, g);
@@ -200,8 +209,11 @@ function masa(x, z, yon = 0, renk = '#efe3cf') {
   parca(yuvarlakKutu(0.62, 0.38, 0.035, 0.015), '#22272a', 0, 1.12, 0.22, g);
   const e = new THREE.Mesh(new THREE.PlaneGeometry(0.57, 0.33), new THREE.MeshBasicMaterial({ color: '#6ec8d6' })); e.position.set(0, 1.12, 0.2); e.rotation.y = Math.PI; g.add(e); EKRANLAR.push(e);
   parca(kutu(0.04, 0.2, 0.04), '#22272a', 0, 0.87, 0.24, g); parca(kutu(0.2, 0.015, 0.14), '#22272a', 0, 0.785, 0.24, g);
-  parca(yuvarlakKutu(0.44, 0.02, 0.14, 0.008), '#e9edf0', 0, 0.79, -0.08, g);
-  parca(new THREE.SphereGeometry(0.03, 10, 8), '#e9edf0', 0.32, 0.795, -0.08, g).scale.set(1, 0.5, 1.4);
+  // klavye (koyu gövde + tuşlu üst yüz), mouse pad ve mouse — kişinin önünde
+  parca(yuvarlakKutu(0.46, 0.022, 0.16, 0.008), '#26292d', KLV_X, 0.789, KLV_Z, g);
+  const ky = new THREE.Mesh(KLAVYE_GEO, KLAVYE_MAT); ky.rotation.x = -Math.PI / 2; ky.position.set(KLV_X, 0.8005, KLV_Z); ky.receiveShadow = true; g.add(ky);
+  parca(kutu(0.26, 0.004, 0.21), '#1c2024', FARE_X, 0.782, KLV_Z, g, false);
+  parca(new THREE.SphereGeometry(0.032, 14, 10), '#3a3f44', FARE_X, 0.792, KLV_Z, g).scale.set(0.95, 0.5, 1.45);
   return g;
 }
 function sandalye(x, z, yon = 0, renk = '#2c3e45') {
@@ -457,6 +469,10 @@ async function insan(o) {
   const kok = new THREE.Group(); kok.add(m); sahne.add(kok);
   const k = { kok, m, o, mx: new THREE.AnimationMixer(m), aks: {}, simdi: null, ust: null, cins: o.model.includes('Female') ? 'f' : 'm' };
   m.traverse(n => { if (n.isBone && /R.?Hand$/i.test(n.name)) k.sagEl = n; });
+  const kemik = ad => { let b = null; m.traverse(n => { if (n.isBone && n.name.replace(/[ _]/g, '') === ad) b = n; }); return b; };
+  k.omurga = kemik('Bip01Spine1');
+  k.ik = { L: [kemik('Bip01LUpperArm'), kemik('Bip01LForearm'), kemik('Bip01LHand')], R: [kemik('Bip01RUpperArm'), kemik('Bip01RForearm'), kemik('Bip01RHand')] };
+  k.yaziW = 0; k.fare = false; k.faz = Math.random() * 10;
   const e = document.createElement('div'); e.className = 'etiket'; e.innerHTML = '<b></b><span></span>'; e.querySelector('b').textContent = o.ad;
   document.getElementById('etiketler').append(e); e.querySelector('b').onclick = () => { try { parent.postMessage({ tur: 'sec', id: o.id }, '*'); } catch (x) {} }; k.etiket = e; k.durumYazi = e.querySelector('span');
   k.uyari = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), new THREE.MeshBasicMaterial({ color: '#ff3b30' })); k.uyari.visible = false; sahne.add(k.uyari);
@@ -470,11 +486,45 @@ async function oynat(k, ad, gecis = 0.5) {
 }
 // masada klavyede çalışma: oturuş temel kalır, sadece kollar/eller "work" hareketini yapar
 const KOL = /Clavicle|UpperArm|Forearm|Hand|Finger/i;
-async function kolOynat(k, ad, gecis = 0.6) {
-  if (!ad) { if (k.kol) { k.kol.fadeOut(gecis); k.kol = null; } return; }
-  const tam = k.cins + '_' + ad + '#kol'; const c = await klip(k.cins + '_' + ad);
-  const a = k.aks[tam] || (k.aks[tam] = k.mx.clipAction((() => { const x = c.clone(); x.tracks = x.tracks.filter(t => KOL.test(t.name)); return x; })()));
-  if (k.kol === a) return; a.reset().setEffectiveWeight(3).fadeIn(gecis).play(); if (k.kol) k.kol.fadeOut(gecis); k.kol = a;
+async function kolOynat(k, ad) {
+  if (!ad) { k.kol = null; k.yazi = false; return; }
+  k.kol = true; k.yazi = true; k.fare = Math.random() < 0.3; k.fareDegis = 0;
+}
+// ters kinematik: animasyondan sonra kolları klavyeye / mouse'a uzatır
+const _P = new THREE.Vector3(), _E = new THREE.Vector3(), _T = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(),
+  _qw = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qr = new THREE.Quaternion(), _q0 = new THREE.Quaternion();
+function ccd(zincir, hedef, w) {
+  const [u, f, h] = zincir; if (!u || !f || !h) return;
+  const eski = [u.quaternion.clone(), f.quaternion.clone(), h.quaternion.clone()];
+  for (let it = 0; it < 6; it++) for (const b of [f, u]) {
+    b.getWorldPosition(_P); h.getWorldPosition(_E);
+    _a.subVectors(_E, _P).normalize(); _b.subVectors(hedef, _P).normalize();
+    _qr.setFromUnitVectors(_a, _b); b.getWorldQuaternion(_qw); b.parent.getWorldQuaternion(_qp);
+    b.quaternion.copy(_qp.invert().multiply(_qr.multiply(_qw))); b.updateMatrixWorld(true);
+  }
+  // el ayası aşağı: eli ön kol ekseni etrafında çevir
+  f.getWorldPosition(_P); h.getWorldPosition(_E); _a.subVectors(_E, _P).normalize();
+  _qr.setFromAxisAngle(_a, zincir.don); h.getWorldQuaternion(_qw); h.parent.getWorldQuaternion(_qp);
+  h.quaternion.copy(_qp.invert().multiply(_qr.multiply(_qw)));
+  if (w < 1) [u, f, h].forEach((b, i) => b.quaternion.copy(eski[i].slerp(b.quaternion, w)));
+  u.updateMatrixWorld(true);
+}
+let EL_DON_L = 0, EL_DON_R = 0;
+function yaziIK(k, dt, t) {
+  const hedefW = (k.yazi && k.oturuyor) ? 1 : 0; k.yaziW += (hedefW - k.yaziW) * Math.min(1, dt * 3);
+  if (k.yaziW < 0.01 || !k.ik.L[0]) return;
+  if (k.yazi && (k.fareDegis -= dt) < 0) { k.fare = Math.random() < 0.3; k.fareDegis = 3 + Math.random() * 6; }
+  // yazarken gövde hafif öne eğilir
+  if (k.omurga) { const y = k.kok.rotation.y; _a.set(Math.cos(y), 0, -Math.sin(y)); _qr.setFromAxisAngle(_a, 0.2 * k.yaziW);
+    k.omurga.getWorldQuaternion(_qw); k.omurga.parent.getWorldQuaternion(_qp); k.omurga.quaternion.copy(_qp.invert().multiply(_qr.multiply(_qw))); }
+  k.kok.updateMatrixWorld(true);
+  const [mx, mz] = k.o.masa, kz = mz + 0.78 + KLV_Z, ft = t * 1 + k.faz;
+  const vur = (s) => 0.008 * Math.max(0, Math.sin(ft * 11 + s)) + 0.004 * Math.sin(ft * 7.3 + s * 2);
+  k.ik.L.don = EL_DON_L; k.ik.R.don = EL_DON_R;
+  _T.set(mx + KLV_X + 0.1 + 0.015 * Math.sin(ft * 1.7), 0.835 + vur(0), kz - 0.04); ccd(k.ik.L, _T, k.yaziW);
+  if (k.fare) _T.set(mx + FARE_X + 0.01 * Math.sin(ft * 1.3), 0.83, kz - 0.03 + 0.012 * Math.sin(ft * 0.9));
+  else _T.set(mx + KLV_X - 0.1 + 0.015 * Math.sin(ft * 1.5 + 1), 0.835 + vur(2.1), kz - 0.04);
+  ccd(k.ik.R, _T, k.yaziW);
 }
 async function ustOynat(k, ad, gecis = 0.5) {
   if (!ad) { if (k.ust) { k.ust.fadeOut(gecis); k.ust = null; } return; }
@@ -597,7 +647,7 @@ function evreBul() { const m = dakika();
   if (m >= 12 * 60 + 30 && m < 13 * 60 + 30) return 'ogle'; return 'mesai'; }
 const KAPI_DIS = [27.6, 13.0], KAPI_IC = [24.8, 13.0];
 function masaGorevi(k) { const [x, z] = k.o.masa; const l = ISLER[k.o.id];
-  return [{ tur: 'git', hedef: [x, z], not: 'Masasına gidiyor' }, { tur: 'otur', yer: [x, z], yon: 0, sure: 35 + Math.random() * 50, masada: true, not: canliIs(k.o.id) || l[Math.random() * l.length | 0] }]; }
+  return [{ tur: 'git', hedef: [x, z], not: 'Masasına gidiyor' }, { tur: 'otur', yer: [x, z + (k.cins === 'f' ? 0.12 : 0.05)], yon: 0, sure: 35 + Math.random() * 50, masada: true, not: canliIs(k.o.id) || l[Math.random() * l.length | 0] }]; }
 function molaGorevi(k) { const r = Math.random();
   if (r < 0.45) return [{ tur: 'git', hedef: [18.6 + Math.random() * 3, 1.25], not: 'Çay almaya gidiyor' }, { tur: 'dur', yon: Math.PI, sure: 2.2, not: 'Çay dolduruyor' },
     { tur: 'dur', yon: Math.PI / 2, anim: 'drink_drinking', sure: 12, bardak: true, not: 'Çay molası ☕' }];
@@ -660,7 +710,7 @@ let hazir = false;
     let n = 0;
     const kisiler = await Promise.all(KADRO.map(o => insan(o).then(k => { n++; yukb.style.width = (n / KADRO.length * 70) + '%'; yukt.textContent = o.ad + ' geldi'; return k; })));
     kisiler.forEach(k => { EKIP[k.o.id] = k; });
-    const animler = ['work_table', 'work_mid', 'walk_neutral_01', 'idle_neutral_01', 'idle_look_around_01', 'drink_drinking', 'cell_phone_talk_01', 'gestic_talk_neutral_01'];
+    const animler = ['walk_neutral_01', 'idle_neutral_01', 'idle_look_around_01', 'drink_drinking', 'cell_phone_talk_01', 'gestic_talk_neutral_01'];
     const hepsi = []; ['m', 'f'].forEach(c => { animler.forEach(a => hepsi.push(c + '_' + a)); OTUR_HAREK[c].forEach(a => hepsi.push(c + '_' + a)); });
     let a = 0; await Promise.all(hepsi.map(h => klip(h).then(() => { a++; yukb.style.width = (70 + a / hepsi.length * 30) + '%'; })));
     KLIP['m_drink_idle'] = KLIP['m_drink_drinking']; KLIP['f_drink_idle'] = KLIP['f_drink_drinking'];
@@ -713,7 +763,7 @@ function kare() {
         else gorev(k, [{ tur: 'bekle', sure: 20 }]);
       }
       k.oturuyor = !!(k.g && k.g.tur === 'otur' && k.o.masa && Math.hypot(k.kok.position.x - k.o.masa[0], k.kok.position.z - k.o.masa[1]) < 0.2);
-      k.mx.update(dt);
+      k.mx.update(dt); yaziIK(k, dt, t);
     });
     // eldeki bardak dik dursun
     Object.values(EKIP).forEach(k => { if (k.bardak.visible) { k.kok.updateMatrixWorld(true); k.sagEl.getWorldQuaternion(_q); k.bardak.quaternion.copy(_q.invert()); } });
@@ -747,6 +797,8 @@ function kare() {
 }
 kare();
 addEventListener('resize', () => { if (innerWidth < 4 || innerHeight < 4) return; renderer.setSize(innerWidth, innerHeight); kamera.aspect = innerWidth / innerHeight; kamera.updateProjectionMatrix(); if (!ELLE) cerceve(); });   // kullanıcı yakınlaştırdıysa ekran boyu değişince görünümü sıfırlama
+window.__ekip = () => EKIP;
+window.__eldon = (l, r) => { EL_DON_L = l; EL_DON_R = r; };
 window.__kamera = (p, h) => { kamera.position.set(...p); kontrol.target.set(...h); kontrol.update(); };
 window.__kalca = () => { const r = {}; const w = new THREE.Vector3(); Object.values(EKIP).forEach(k => { let b = null; k.m.traverse(n => { if (!b && n.isBone && /Pelvis$/.test(n.name)) b = n; }); if (b) { b.getWorldPosition(w); r[k.o.id] = [w.x, w.z, k.g ? k.g.tur : '']; } }); return r; };
 window.__durum = () => Object.values(EKIP).map(k => k.o.id + ':' + (k.g ? k.g.tur + '/' + (k.g.not || '') : '-') + '@' + k.kok.position.x.toFixed(1) + ',' + k.kok.position.z.toFixed(1)).join(' | ');
