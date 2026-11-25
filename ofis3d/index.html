@@ -468,6 +468,14 @@ async function oynat(k, ad, gecis = 0.5) {
   const c = await klip(tam); const a = k.aks[tam] || (k.aks[tam] = k.mx.clipAction(c));
   if (k.simdi === a) return; a.reset().setEffectiveWeight(1).fadeIn(gecis).play(); if (k.simdi) k.simdi.fadeOut(gecis); k.simdi = a;
 }
+// masada klavyede çalışma: oturuş temel kalır, sadece kollar/eller "work" hareketini yapar
+const KOL = /Clavicle|UpperArm|Forearm|Hand|Finger/i;
+async function kolOynat(k, ad, gecis = 0.6) {
+  if (!ad) { if (k.kol) { k.kol.fadeOut(gecis); k.kol = null; } return; }
+  const tam = k.cins + '_' + ad + '#kol'; const c = await klip(k.cins + '_' + ad);
+  const a = k.aks[tam] || (k.aks[tam] = k.mx.clipAction((() => { const x = c.clone(); x.tracks = x.tracks.filter(t => KOL.test(t.name)); return x; })()));
+  if (k.kol === a) return; a.reset().setEffectiveWeight(3).fadeIn(gecis).play(); if (k.kol) k.kol.fadeOut(gecis); k.kol = a;
+}
 async function ustOynat(k, ad, gecis = 0.5) {
   if (!ad) { if (k.ust) { k.ust.fadeOut(gecis); k.ust = null; } return; }
   const tam = k.cins + '_' + ad + '#ust'; const c = await klip(k.cins + '_' + ad);
@@ -559,14 +567,21 @@ function isle(k, dt, t) {
   if (!k.g) sonraki(k); const g = k.g; if (!g) return;
   g.t += dt;
   if (g.basla) { g.basla = false; k.durumYazi.textContent = g.not || ''; k.bardak.visible = !!g.bardak;
-    if (g.tur === 'git') { g.yol = yolBul([k.kok.position.x, k.kok.position.z], g.hedef); oynat(k, 'walk_neutral_01', 0.35); ustOynat(k, g.ust || null); }
-    else if (g.tur === 'otur') { oynat(k, g.anim || OTUR_HAREK[k.cins][0], 0.6); ustOynat(k, g.ust || null); g.degis = 6 + Math.random() * 8; }
-    else if (g.tur === 'dur') { oynat(k, g.anim || 'idle_neutral_01', 0.5); ustOynat(k, g.ust || null); }
+    if (g.tur === 'git') { g.yol = yolBul([k.kok.position.x, k.kok.position.z], g.hedef); oynat(k, 'walk_neutral_01', 0.35); ustOynat(k, g.ust || null); kolOynat(k, null, 0.3); }
+    else if (g.tur === 'otur') { oynat(k, g.anim || OTUR_HAREK[k.cins][0], 0.6); ustOynat(k, g.ust || null);
+      if (g.masada) kolOynat(k, Math.random() < 0.5 ? 'work_table' : 'work_mid'); else kolOynat(k, null);
+      g.degis = 8 + Math.random() * 10; }
+    else if (g.tur === 'dur') { oynat(k, g.anim || 'idle_neutral_01', 0.5); ustOynat(k, g.ust || null); kolOynat(k, null, 0.3); }
   }
   if (g.tur === 'git') { if (yuru(k, dt)) sonraki(k); return; }
   if (g.yer) { _hedef.set(g.yer[0], 0, g.yer[1]); k.kok.position.lerp(_hedef, Math.min(1, dt * 5)); }
   if (g.yon != null) don(k, g.yon, dt);
-  if (g.tur === 'otur' && !g.anim && g.t > g.degis) { g.degis = g.t + 6 + Math.random() * 10; const l = OTUR_HAREK[k.cins]; oynat(k, l[Math.random() * l.length | 0], 0.8); }
+  if (g.tur === 'otur' && !g.anim && g.t > g.degis) {
+    if (g.masada) {   // masada: çoğunlukla klavyede yazıyor, arada kısa bir mola hareketi
+      if (k.kol && Math.random() < 0.2) { kolOynat(k, null); const l = OTUR_HAREK[k.cins]; oynat(k, l[1 + (Math.random() * (l.length - 1) | 0)], 0.8); g.degis = g.t + 4 + Math.random() * 3; }
+      else { oynat(k, OTUR_HAREK[k.cins][0], 0.8); kolOynat(k, Math.random() < 0.5 ? 'work_table' : 'work_mid'); g.degis = g.t + 12 + Math.random() * 14; }
+    } else { g.degis = g.t + 6 + Math.random() * 10; const l = OTUR_HAREK[k.cins]; oynat(k, l[Math.random() * l.length | 0], 0.8); }
+  }
   if (g.sure != null && g.t > g.sure) sonraki(k);
 }
 
@@ -645,7 +660,7 @@ let hazir = false;
     let n = 0;
     const kisiler = await Promise.all(KADRO.map(o => insan(o).then(k => { n++; yukb.style.width = (n / KADRO.length * 70) + '%'; yukt.textContent = o.ad + ' geldi'; return k; })));
     kisiler.forEach(k => { EKIP[k.o.id] = k; });
-    const animler = ['walk_neutral_01', 'idle_neutral_01', 'idle_look_around_01', 'drink_drinking', 'cell_phone_talk_01', 'gestic_talk_neutral_01'];
+    const animler = ['work_table', 'work_mid', 'walk_neutral_01', 'idle_neutral_01', 'idle_look_around_01', 'drink_drinking', 'cell_phone_talk_01', 'gestic_talk_neutral_01'];
     const hepsi = []; ['m', 'f'].forEach(c => { animler.forEach(a => hepsi.push(c + '_' + a)); OTUR_HAREK[c].forEach(a => hepsi.push(c + '_' + a)); });
     let a = 0; await Promise.all(hepsi.map(h => klip(h).then(() => { a++; yukb.style.width = (70 + a / hepsi.length * 30) + '%'; })));
     KLIP['m_drink_idle'] = KLIP['m_drink_drinking']; KLIP['f_drink_idle'] = KLIP['f_drink_drinking'];
